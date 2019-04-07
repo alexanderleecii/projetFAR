@@ -10,7 +10,7 @@
 
 #define PORT 2633
 #define IP "172.20.10.4"
-#define TAILLE_MAX 50*sizeof(char)
+#define TAILLE_MAX 50
 
 int connexionServeur(int port, char ip[]){
 	int dS=socket(PF_INET, SOCK_STREAM,0);//Creation socket
@@ -44,6 +44,7 @@ int echange(){
 	int id1,id2,idActuel;
 	int client1=connexionServeur(PORT,IP); //On crée un premier socket + connexion au serveur
 	int res=recv(client1,&id1,sizeof(int),0); //On réceptionne l'id du premier socket qui servira à organiser l'échange
+	
 	if(res==-1){
 		printf("Reception non reussie.\n");
 		return 1;
@@ -54,24 +55,25 @@ int echange(){
 		printf("Reception non reussie.\n");
 		return 2;
 	}
-	
-	char *message;
-	char recupMessage[TAILLE_MAX];
-	char messageRecu[TAILLE_MAX];
 
 	idActuel=id1;
 	while(idActuel!=-1){
+		char *message=(char *)malloc((TAILLE_MAX+1)*sizeof(char));
+		char recupMessage[TAILLE_MAX];
+		char messageRecu[TAILLE_MAX];
 		if(idActuel==id1){
 			printf("Client 1, entrez un message : ");
 			fgets(recupMessage,TAILLE_MAX,stdin);
+			char *pos=strchr(recupMessage,'\n');
+			*pos='\0';
 			message=recupMessage;
-			int s = send(client1,message,TAILLE_MAX,0);
+			int s = send(client1,message,TAILLE_MAX*sizeof(char),0);
 			if(s==-1){
 				printf("Erreur envoi client 1\n");
 				return 3;
 			}
-			int rec = recv(client2,messageRecu,TAILLE_MAX,0);
-			
+			int rec = recv(client2,&messageRecu,TAILLE_MAX*sizeof(char),0);
+
 			if(rec==-1){
 				printf("Erreur reception client 2\n");
 				return 4;
@@ -81,19 +83,22 @@ int echange(){
 		else if(idActuel==id2){
 			printf("Client 2, entrez un message : ");
 			fgets(recupMessage,TAILLE_MAX,stdin);
+			char *pos=strchr(recupMessage,'\n');
+			*pos='\0';
 			message=recupMessage;
-			int s = send(client2,message,TAILLE_MAX,0);
+			int s = send(client2,message,TAILLE_MAX*sizeof(char),0);
 			if(s==-1){
 				printf("Erreur envoi client 2\n");
 				return 5;
 			}
-			int rec = recv(client1,messageRecu,TAILLE_MAX,0);
+			int rec = recv(client1,&messageRecu,TAILLE_MAX*sizeof(char),0);
 			if(rec==-1){
 				printf("Erreur reception client 1\n");
 				return 6;
 			}
 			printf("Client 2 : %s\n",messageRecu);
 		}
+
 		if(strcmp(messageRecu,"fin")==0){
 			idActuel=-1;
 		}

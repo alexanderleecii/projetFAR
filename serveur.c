@@ -10,7 +10,7 @@
 
 #define PORT 2633
 #define IP "172.20.10.4"
-#define TAILLE_MAX 50*sizeof(char)
+#define TAILLE_MAX 50
 
 int serveur(){
 	int dS = socket(PF_INET, SOCK_STREAM, 0); //creation socket serveur
@@ -57,42 +57,106 @@ int serveur(){
 		return 15;
 	}
 
-	char message[TAILLE_MAX];
-	int echange=1;
 	
-	printf("Preparation a la reception, veuillez patienter 10s ...\n");
-	sleep(10);
+	
+	int echange=1;
 
+	printf("Preparation a la reception, veuillez patienter 2s ...\n");
+	sleep(2);
+	int idActuel=1;
 	//tant que les clients sont connectés
 	while(echange==1){
-		//reception message venant de 1 et envoi au client 2
-		int rec1 = recv(dSClient1, message,sizeof(message),0);
-		if(rec1==-1){
-			printf("erreur reception message du client 1");
-			return 16;
+		char* message=(char*)malloc((TAILLE_MAX+1)*sizeof(char)); //stockera les messages recus par le serveur
+		char messageSend[TAILLE_MAX]; //contiendra le message a envoyer aux clients
+		if(idActuel==1){
+			//reception message venant de 1 et envoi au client 2
+			int rec1 = recv(dSClient1, message,TAILLE_MAX*sizeof(char),0);
+			if(rec1==-1){
+				printf("erreur reception message du client 1");
+				return 16;
+			}
+			printf("recu serveur : %s\n", message);
+			if(strcmp(message,"fin")==0){
+				int i=0;
+				while(message[i]!='\0'){
+					messageSend[i]=message[i];
+					i++;
+				}
+				messageSend[i]='\0';
+				int su=send(dSClient2,&messageSend,TAILLE_MAX*sizeof(char),0);
+				if(su==-1){
+					printf("Erreur envoi client2.\n");
+					return 17;
+				}
+				
+				free(message);
+				close(dSClient1);
+				close(dSClient2);
+				echange=0;
+			}
+			else{
+				int i=0;
+				while(message[i]!='\0'){
+					messageSend[i]=message[i];
+					i++;
+				}
+				messageSend[i]='\0';
+				int su=send(dSClient2,&messageSend,TAILLE_MAX*sizeof(char),0);
+				if(su==-1){
+					printf("Erreur envoi client2.\n");
+					return 17;
+				}
+				free(message);			
+			}	
 		}
-		printf("recu serveur : %s\n", message);
-		if(strcmp(message,"fin")==0){
-			close(dSClient1);
-			//close(dSClient2);
-			echange=0;
+		else if(idActuel==2){
+			//reception message venant de 2 et envoi au client 1
+			int rec2 = recv(dSClient2, message,TAILLE_MAX*sizeof(char),0);
+			if(rec2==-1){
+				printf("erreur reception message du client 2");
+				return 18;
+			}
+			printf("recu serveur : %s\n", message);
+			if(strcmp(message,"fin")==0){
+				int i=0;
+				while(message[i]!='\0'){
+					messageSend[i]=message[i];
+					i++;
+				}
+				messageSend[i]='\0';
+				int su=send(dSClient1,&messageSend,TAILLE_MAX*sizeof(char),0);
+				if(su==-1){
+					printf("Erreur envoi client2.\n");
+					return 17;
+				}
+				free(message);
+				close(dSClient1);
+				close(dSClient2);
+				echange=0;
+			}
+			else{
+				int i=0;
+				while(message[i]!='\0'){
+					messageSend[i]=message[i];
+					i++;
+				}
+				messageSend[i]='\0';
+				int su=send(dSClient1,&messageSend,TAILLE_MAX*sizeof(char),0);
+				if(su==-1){
+					printf("Erreur envoi client2.\n");
+					return 17;
+				}
+				free(message);
+			}
 		}
-		else{
-			send(dSClient1,message,sizeof(message),0);
+		if(idActuel==1){
+			idActuel=2;
 		}
-		/*recepetion message venant de 2 et envoi au client 1
-		int rec2 = recv(dSClient2, message,sizeof(message),0);
-		if(rec2==-1){
-			printf("erreur reception message du client 2");
-			return 17;
+		else if(idActuel==2){
+			idActuel=1;
 		}
-		printf("recu serveur : %s\n", message);
-		
-		send(dSClient1,message,sizeof(message),0);*/
-		
 	}
 	printf("Fin de la messagerie.\n");
-	close(dS);
 	
 	return 0;
 }
