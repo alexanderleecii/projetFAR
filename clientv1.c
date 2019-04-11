@@ -9,7 +9,7 @@
 #include <time.h>
 
 #define PORT 2633
-#define IP "172.20.10.4"
+#define IP "162.38.111.83"
 #define TAILLE_MAX 50
 
 int connexionServeur(int port, char ip[]){
@@ -58,21 +58,23 @@ int echange(){
 
 	idActuel=id1;
 	while(idActuel!=-1){
-		char *message=(char *)malloc((TAILLE_MAX+1)*sizeof(char));
+		char *message=(char *)malloc((TAILLE_MAX+1)*sizeof(char));//buffer
 		char recupMessage[TAILLE_MAX];
 		char messageRecu[TAILLE_MAX];
 		if(idActuel==id1){
 			printf("Client 1, entrez un message : ");
-			fgets(recupMessage,TAILLE_MAX,stdin);
-			char *pos=strchr(recupMessage,'\n');
+			fgets(recupMessage,TAILLE_MAX,stdin);//réucupere l'entrée clavier dans recupMessage
+			
+			char *pos=strchr(recupMessage,'\n');//repere et remplace le \n ajouté automatiquement à la fin de la chaine de caractere par un \0
 			*pos='\0';
+
 			message=recupMessage;
-			int s = send(client1,message,TAILLE_MAX*sizeof(char),0);
+			int s = send(client1,message,TAILLE_MAX*sizeof(char),0);//Envoi sur le serveur à partir du client1
 			if(s==-1){
 				printf("Erreur envoi client 1\n");
 				return 3;
 			}
-			int rec = recv(client2,&messageRecu,TAILLE_MAX*sizeof(char),0);
+			int rec = recv(client2,&messageRecu,TAILLE_MAX*sizeof(char),0);//Reception à partir du serveur dans le client2
 
 			if(rec==-1){
 				printf("Erreur reception client 2\n");
@@ -83,8 +85,10 @@ int echange(){
 		else if(idActuel==id2){
 			printf("Client 2, entrez un message : ");
 			fgets(recupMessage,TAILLE_MAX,stdin);
+
 			char *pos=strchr(recupMessage,'\n');
 			*pos='\0';
+
 			message=recupMessage;
 			int s = send(client2,message,TAILLE_MAX*sizeof(char),0);
 			if(s==-1){
