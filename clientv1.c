@@ -9,7 +9,7 @@
 #include <time.h>
 
 #define PORT 2633
-#define IP "162.38.111.83"
+#define IP "192.168.1.16"
 #define TAILLE_MAX 50
 
 int connexionServeur(int port, char ip[]){

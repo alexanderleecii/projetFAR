@@ -9,22 +9,8 @@
 #include <time.h>
 
 #define PORT 2633
-#define IP "162.38.111.83"
+#define IP "192.168.1.16"
 #define TAILLE_MAX 50
-
-int socketServeur(){
-	int dS = socket(PF_INET, SOCK_STREAM, 0); //creation socket serveur
-	struct sockaddr_in adServeur; //création de la structure contenant l'adresse du serveur
-	adServeur.sin_family=AF_INET; //famille d'adresse
-	adServeur.sin_addr.s_addr=INADDR_ANY;
-	adServeur.sin_port=htons(PORT); //définition du port
-	int sockAd = bind(dS,(struct sockaddr*)&adServeur, sizeof(adServeur)); //lie la socket a une adresse
-	if (sockAd==-1){
-		printf("erreur association");
-		return -1;
-	}
-	return dS;
-}
 
 int serveur(){
 	int dS = socket(PF_INET, SOCK_STREAM, 0); //creation socket serveur
@@ -62,7 +48,7 @@ int serveur(){
 			return 13;
 		}
 
-		//accept client 2 sur serveur /!\Besoin que d'un seul client
+		//accept client 2 sur serveur
 		int dSClient2 = accept(dS,(struct sockaddr*)&adClient2,&lg); //connexion socket
 		if (dSClient2 == -1){
 			printf("erreur connexion socket client2");
@@ -177,6 +163,7 @@ int serveur(){
 			}
 		}
 		printf("Déconnexion des clients.\n");
+		printf("En attente de reconnexion ...\n");
 	}
 	close(dS);
 	return 0;
