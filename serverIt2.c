@@ -37,9 +37,11 @@ int creation_serveur(){
 
 int cli1_vers_cli2(int tab[]){
 
-    dSClient1=tab[0];
-    dSClient2=tab[1];
+    int dSClient1=tab[0];
+    int dSClient2=tab[1];
 
+    char* message=(char*)malloc((TAILLE_MAX+1)*sizeof(char)); //stockera les messages recus par le serveur
+	char messageSend[TAILLE_MAX]; //contiendra le message a envoyer aux clients
 
     while (1){
         //reception message venant de 1 et envoi au client 2
@@ -66,7 +68,6 @@ int cli1_vers_cli2(int tab[]){
             free(message); //On libère la mémoire allouée au pointeur message
             close(dSClient1);
             close(dSClient2);
-            echange=0;
         }
         else{
             int i=0;
@@ -90,8 +91,11 @@ int cli1_vers_cli2(int tab[]){
 
 int cli2_vers_cli1(int tab[]){
 
-    dSClient1=tab[0];
-    dSClient2=tab[1];
+    int dSClient1=tab[0];
+    int dSClient2=tab[1];
+
+    char* message=(char*)malloc((TAILLE_MAX+1)*sizeof(char)); //stockera les messages recus par le serveur
+	char messageSend[TAILLE_MAX]; //contiendra le message a envoyer aux clients
 
     while(1){
 
@@ -118,7 +122,6 @@ int cli2_vers_cli1(int tab[]){
             free(message);//On libere la mémoire allouée à message
             close(dSClient1);
             close(dSClient2);
-            echange=0;
         }
         else{
             int i=0;
@@ -145,7 +148,22 @@ int cli2_vers_cli1(int tab[]){
 
 int main (void){
     //mise en place du serveur
-    creation_serveur();
+
+    int dS = socket(PF_INET, SOCK_STREAM, 0); //creation socket serveur
+	struct sockaddr_in adServeur; //création de la structure contenant l'adresse du serveur
+	adServeur.sin_family=AF_INET; //famille d'adresse
+	adServeur.sin_addr.s_addr=INADDR_ANY;
+	adServeur.sin_port=htons(PORT); //définition du port
+	int sockAd = bind(dS,(struct sockaddr*)&adServeur, sizeof(adServeur)); //lie la socket a une adresse
+	if (sockAd==-1){
+		printf("erreur association");
+		return -1;
+	}
+	listen(dS,10); //socket en mode ecoute (10 represente le nb max de demandes de connexion pouvant etre mis en attente)
+
+    struct sockaddr_in adClient1; //structure de l'adresse client 1
+	struct sockaddr_in adClient2; //strucutre de l'adresse client 2
+	socklen_t lg = sizeof(struct sockaddr_in*);
 
     //accept client 1 sur serveur
     int dSClient1 = accept(dS,(struct sockaddr*)&adClient1,&lg); //connexion socket
@@ -161,7 +179,7 @@ int main (void){
         return 14;
     }
 
-    int tabCli[2]:
+    int tabCli[2];
     tabCli[0]=dSClient1;
     tabCli[1]=dSClient2;
     //identifiant thread pour la communication du client 1 vers le client 2
@@ -170,13 +188,13 @@ int main (void){
     pthread_t threadCli2_to_Cli1;
 
     //creation thread client 1 vers client 2
-    int thread1 = pthread_create(&threadCli1_to_Cli2, NULL, cli1_vers_cli2, tabCli)
+    int thread1 = pthread_create(&threadCli1_to_Cli2, NULL, cli1_vers_cli2, tabCli);
     if (thread1 == -1){
         printf("erreur thread client1 vers client 2");
         return 98;
     }
     //creation thread client 2 vers client 1
-    int thread2 = pthread_create(&threadCli2_to_Cli1, NULL, cli1_vers_cli2, tabCli)
+    int thread2 = pthread_create(&threadCli2_to_Cli1, NULL, cli1_vers_cli2, tabCli);
     if (thread2 == -1){
         printf("erreur thread client1 vers client 2");
         return 99;
