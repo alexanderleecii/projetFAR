@@ -7,28 +7,27 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <pthread.h>
+#include <signal.h>
 
-#define TAILLE_MAX 50
+#define TAILLE_MAX 500
 #define PORT 2633
-#define IP "192.168.1.99"
+#define IP "172.20.10.4"
 
 
-int dS;
+int dS=8;
 
 int recep_mess(char *mess, int dScli){
+
+	int rec = recv(dScli,mess,TAILLE_MAX*sizeof(char),0);//Reception à partir du serveur dans le client
 	
-
-	int rec = recv(dScli,&mess,TAILLE_MAX*sizeof(char),0);//Reception à partir du serveur dans le client
-
 	if(rec==-1){
 		printf("Erreur reception client \n");
-			return 4;
+		return 4;
 	}
 	//verifie si le message envoye est fin, si oui exit 
 	if(strcmp(mess, "fin") == 0){
 		printf("deconnection du serveur.\n");
-		sleep(3);
-		exit(1);//pas sur de cet exit()
+		close(dS);
 	}
 	if(strcmp("bienvenue client 1",mess)==0){
 		printf("bienvenue client 1");
@@ -36,16 +35,16 @@ int recep_mess(char *mess, int dScli){
 	if(strcmp("bienvenue client 2",mess)==0){
 		printf("bienvenue client 2");
 	}
-	puts(mess);
 
 	return rec;
 
 }
 
 void *thread_saisie(void *arg){
-	char *message=(char *)malloc((TAILLE_MAX+1)*sizeof(char));//buffer
+	char *message=(char *)malloc((TAILLE_MAX)*sizeof(char));//buffer
 	char recupMessage[TAILLE_MAX];
 	while(1){
+		printf("> ");
 		//recupere l'entree clavier dans recupMessage
 		fgets(recupMessage,TAILLE_MAX,stdin);
 		char *pos=strchr(recupMessage,'\n');//repere et remplace le \n ajouté automatiquement à la fin de la chaine de caractere par un \0
@@ -53,46 +52,39 @@ void *thread_saisie(void *arg){
 
 		message=recupMessage;
 
-		if(strcmp(message,"fin")==0){
-			exit(1);
+		if(send(dS,message,(strlen(message)+1)*sizeof(char),0)==-1){
+			printf("Erreur envoi message.\n");
 		}
 
-		send(dS,message,TAILLE_MAX*sizeof(char),0);
+		if(strcmp(message,"fin")==0){
+			kill(getpid(),1);
+		}
 	}
 	
 
 }
 
 void *thread_reception(void *arg){
-	char mess[TAILLE_MAX]="";
+	char mess[TAILLE_MAX];
 	while(1){
 		recep_mess(mess,dS);
 		if(strcmp(mess,"fin")==0){
-			exit(1);
+			kill(getpid(),1);
 		}
-	puts(mess);
-
+		puts(mess);
 	}
-
-
-
 }
-
-
-
-
-
 
 
 int communication(){
 	//mise en place du client
-	int dS=socket(PF_INET, SOCK_STREAM,0);//Creation socket
+	dS=socket(PF_INET, SOCK_STREAM,0);//Creation socket
 
 	if(dS==-1){
 		printf("Erreur de création du socket client.\n");
 		return 1;
 	}
-
+	
 	struct sockaddr_in adServ; //définit un type générique d'adresses
 	adServ.sin_family=AF_INET;
 	adServ.sin_port=htons(PORT);
@@ -109,35 +101,32 @@ int communication(){
 		return 3;
 	}
 
-	char mess[TAILLE_MAX]="";
-	while(1){
-		pthread_t threadRecep;
-		pthread_t threadSaisie;
+	pthread_t threadRecep;
+	pthread_t threadSaisie;
 
-		int trecep = pthread_create(&threadRecep,NULL,thread_reception,NULL);
-		if(trecep!=0){
-			printf("erreur thread recepetion");
-			return 80;
-		}
-
-		int tsaisie = pthread_create(&threadSaisie,NULL,thread_saisie,NULL);
-		if(tsaisie!=0){
-			printf("erreur thread saisie");
-			return 81;
-		}
-
-		if(pthread_join(thread_reception,NULL)){
-			printf("probleme join reception");
-			return 82;
-		}
-
-		if(pthread_join(thread_saisie,NULL)){
-			printf("probleme join saisie");
-			return 83;
-		}
-
-		return 0;
+	int trecep = pthread_create(&threadRecep,NULL,thread_reception,NULL);
+	if(trecep!=0){
+		printf("erreur thread recepetion");
+		return 80;
 	}
+	
+	int tsaisie = pthread_create(&threadSaisie,NULL,thread_saisie,NULL);
+	if(tsaisie!=0){
+		printf("erreur thread saisie");
+		return 81;
+	}
+	
+	if(pthread_join(threadRecep,NULL)){
+		printf("probleme join reception");
+		return 82;
+	}
+	
+	if(pthread_join(threadSaisie,NULL)){
+		printf("probleme join saisie");
+		return 83;
+	}
+	
+	return 0;
 }
 
 
