@@ -17,44 +17,61 @@
 int nbCliActuel;
 int dSCli[NBCLIENT];
 char tabPseudo[NBCLIENT][30];
+int dispoNum[NBCLIENT][1];
 
 pthread_t connecte[NBCLIENT];
 
 
 void recep_pseudo(char *pseudo, int num){
-	if(recv(dSCli[num],pseudo,(strlen(pseudo)+1)*sizeof(char),0)!=0){ //&pseudo ?
+	if(recv(dSCli[num],pseudo,TAILLE_MAX*sizeof(char),0)<0){ //&pseudo ?
 		printf("erreur reception pseudo\n");
 	}
 	strcpy(tabPseudo[num],pseudo); //&pseudo ? //stock les pseudo
+	dispoNum[num][0]=1;
 }
 
 void* thread_recep_envoie(void *arg){
 	char mess[TAILLE_MAX];
 	int num = *((int *) arg);//Revoir ça
-	if(recv(dSCli[num],mess,(strlen(mess)+1)*sizeof(char),0)!=0){
-		printf("erreur reception thread\n");
-	}
-
-
-
-	if(strcmp(mess,"fin")==0){
-		for(int i=0;i<nbCliActuel;i++){
-			close(dSCli[i]);
+	int octMsg;
+	while(1){
+		int rec = recv(dSCli[num],&octMsg,sizeof(int),0);//nb octets
+		if(rec<0){
+			printf("erreur reception taille\n");
 		}
-	}
-	char affichage[TAILLE_MAX];
-	strcpy(affichage,tabPseudo[num]);
-	strcat(affichage," : ");
-	strcat(affichage,mess);
-
-	for(int parcoursCli=0;parcoursCli<nbCliActuel;parcoursCli++){
-		if(parcoursCli!=num){
-			if(send(dSCli[parcoursCli],affichage,(strlen(affichage)+1)*sizeof(char),0)!=0){
-				printf("erreur global send\n");
+		int nbOctRecu=0;
+		while(nbOctRecu<octMsg){
+			rec = recv(dSCli[num],mess,octMsg*sizeof(char),0);
+			printf("message : %s\n", mess);
+			if(rec<0){
+				printf("erreur reception thread\n");
+			}
+			nbOctRecu+=rec;
+		}
+		if(strcmp(mess,"fin")==0){
+			printf("Déconnexion du client %d.\n",num+1);
+			nbCliActuel--;
+			dispoNum[num][0]=0;
+			close(dSCli[num]);
+			pthread_exit(NULL);
+		}
+		char affichage[TAILLE_MAX];
+		strcpy(affichage,tabPseudo[num]);
+		strcat(affichage," : ");
+		strcat(affichage,mess);
+		octMsg=sizeof(affichage);
+		for(int parcoursCli=0;parcoursCli<nbCliActuel;parcoursCli++){
+			if(parcoursCli!=num){
+				rec=send(dSCli[parcoursCli],&octMsg,sizeof(int),0);
+				if(rec<0){
+					printf("erreur envoi taille\n");
+				}
+				if(send(dSCli[parcoursCli],affichage,octMsg,0)<0){
+					printf("erreur global send\n");
+				}
 			}
 		}
 	}
-	pthread_exit(NULL);
 
 }
 
@@ -63,23 +80,30 @@ void* thread_connexion(void *arg){
 	int dS = *((int *) arg);
 	struct sockaddr_in aClient;
 	char pseudo[30];
-	int nb=0;
 	socklen_t lgA= sizeof(struct sockaddr_in);
-	while(nb<NBCLIENT){
-		dSCli[nb] = accept(dS, (struct sockaddr *)&aClient,&lgA);
-		if(dSCli[nb]!=0){
+	while(nbCliActuel<NBCLIENT){
+		int i=0;
+		int dispo=0;//Sert à repérer si le numéro de client est dispo ou pas
+		while(dispo!=1){
+			if(dispoNum[i][0]==0){
+				dispo=1;
+			}
+			i++;
+		}
+		int numeroDispo = i-1; //Premier numero de client disponible
+		dSCli[numeroDispo] = accept(dS, (struct sockaddr *)&aClient,&lgA);
+		if(dSCli[numeroDispo]<0){
 			printf("erreur connexion client thread");
 		}
-		recep_pseudo(pseudo,nb);
-		printf("CLIENT %d pseudo %s \n",nb+1,tabPseudo[nb]);
+		recep_pseudo(pseudo,numeroDispo);
+		printf("CLIENT %d pseudo %s \n",numeroDispo+1,tabPseudo[numeroDispo]);
 		int *arg=malloc(sizeof(*arg)); //Revoir ça
-		*arg=nb;//Revoir ça
-		int pcreate = pthread_create(&connecte[nb],NULL,thread_recep_envoie,arg);
+		*arg=numeroDispo;//Revoir ça
+		int pcreate = pthread_create(&connecte[numeroDispo],NULL,thread_recep_envoie,arg);
 		if(pcreate!=0){
 			printf("erreur thread connect");
 		}
 		nbCliActuel++;
-		nb++;
 	}
 
 	pthread_exit(NULL);
@@ -106,6 +130,9 @@ int main(){
 	} //socket en mode ecoute (10 represente le nb max de demandes de connexion pouvant etre mis en attente)
 
 	while(1){
+		for(int i=0;i<NBCLIENT;i++){
+			dispoNum[i][0]=0;
+		}
 		nbCliActuel=0;
 		printf("le serveur sera operationnel lorsque deux clients seront connectes\n");
 

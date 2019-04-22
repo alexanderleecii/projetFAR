@@ -17,22 +17,30 @@
 #define NBCLIENT 50
 
 int dS;
-
+char *message;//buffer
 
 void send_pseudo(char* pseudo){
 	printf("dS serveur : %d\n", dS);
 	if(send(dS,pseudo,(strlen(pseudo)+1)*sizeof(char),0)<0){
 		printf("erreur envoie pseudo\n");
-		pthread_exit(NULL);
 	}
 }
 
 void recep_mess(char *mess,int dSCli){
+	int octMsg;
+	int tailleMsg=recv(dS,&octMsg,sizeof(int),0); //Nombre d'octets du paquet
+	if(tailleMsg<=0){
 
-	if(recv(dSCli,mess,(strlen(mess)+1)*sizeof(char),0)<0){
-		printf("erreur reception message.\n");
 	}
-
+	int nbOctRecu=0;
+	while(nbOctRecu<octMsg){
+		tailleMsg=recv(dSCli,mess,octMsg*sizeof(char),0);
+		if(tailleMsg<0){
+			printf("erreur reception message.\n");
+		}
+		nbOctRecu+=tailleMsg;
+	}
+	
 }
 
 void *thread_reception(void *arg){
@@ -41,7 +49,7 @@ void *thread_reception(void *arg){
 	while(arret==1){
 		recep_mess(mess,dS);
 		//verifie si mess==fin, si oui on coupe le thread sinon on continue
-		if(strcmp(mess,"fin")==0){
+		if(strcmp(message,"fin")==0){
 			arret=0;
 		}
 		puts(mess);
@@ -52,8 +60,7 @@ void *thread_reception(void *arg){
 }
 
 void *thread_saisie(void *arg){
-	
-	char *message=(char *)malloc((TAILLE_MAX)*sizeof(char));//buffer
+	message=(char *)malloc((TAILLE_MAX)*sizeof(char));
 	char recupMessage[TAILLE_MAX];
 	while(1){
 		fgets(recupMessage,TAILLE_MAX,stdin);
@@ -61,13 +68,20 @@ void *thread_saisie(void *arg){
 		*pos='\0';
 
 		message=recupMessage;
-
-		if(send(dS,message,(strlen(message)+1)*sizeof(char),0)!=0){
+		int taille=(strlen(message)+1)*sizeof(char);
+		int res=send(dS,&taille,sizeof(int),0);
+		if(res<0){
+			printf("Erreur envoi taille\n");
+		}
+		res=send(dS,message,(strlen(message)+1)*sizeof(char),0);
+		if(res<0){
 			printf("erreur saisie.\n");
 		}
+		if(strcmp(message,"fin")==0){
+			printf("Deconnexion du serveur...\n");
+			pthread_exit(NULL);
+		}
 	}
-	pthread_exit(NULL);
-
 }
 
 int communication(){
@@ -140,7 +154,8 @@ int communication(){
 		printf("erreur join saisie\n");
 		return 27;
 	}
-
+	pthread_cancel(threadRecep);
+	pthread_cancel(threadSaisie);
 	return 0;
 
 }
