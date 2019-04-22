@@ -11,10 +11,12 @@
 
 #define TAILLE_MAX 500
 #define PORT 2633
-#define IP "172.20.10.4"
+#define IP "192.168.1.16"
 
 
-int dS=8;
+int dS;
+char mess[TAILLE_MAX];
+char *message;//buffer
 
 int recep_mess(char *mess, int dScli){
 
@@ -25,15 +27,14 @@ int recep_mess(char *mess, int dScli){
 		return 4;
 	}
 	//verifie si le message envoye est fin, si oui exit 
-	if(strcmp(mess, "fin") == 0){
-		printf("deconnection du serveur.\n");
-		close(dS);
+	if(strcmp(message, "fin") == 0){
+		printf("Déconnexion du serveur.\n");
 	}
 	if(strcmp("bienvenue client 1",mess)==0){
-		printf("bienvenue client 1");
+		printf("Bienvenue client 1\n");
 	}
 	if(strcmp("bienvenue client 2",mess)==0){
-		printf("bienvenue client 2");
+		printf("Bienvenue client 2\n");
 	}
 
 	return rec;
@@ -41,10 +42,10 @@ int recep_mess(char *mess, int dScli){
 }
 
 void *thread_saisie(void *arg){
-	char *message=(char *)malloc((TAILLE_MAX)*sizeof(char));//buffer
+	message=(char *)malloc((TAILLE_MAX)*sizeof(char));
 	char recupMessage[TAILLE_MAX];
 	while(1){
-		printf("> ");
+		printf(">>> ");
 		//recupere l'entree clavier dans recupMessage
 		fgets(recupMessage,TAILLE_MAX,stdin);
 		char *pos=strchr(recupMessage,'\n');//repere et remplace le \n ajouté automatiquement à la fin de la chaine de caractere par un \0
@@ -56,7 +57,8 @@ void *thread_saisie(void *arg){
 			printf("Erreur envoi message.\n");
 		}
 
-		if(strcmp(message,"fin")==0){
+		if(strcmp(message,"fin")==0 /*|| strcmp(mess,"fin")==0*/){//si le client a envoye fin on arrete ce thread
+			//pthread_exit(NULL);
 			kill(getpid(),1);
 		}
 	}
@@ -65,13 +67,19 @@ void *thread_saisie(void *arg){
 }
 
 void *thread_reception(void *arg){
-	char mess[TAILLE_MAX];
+	message="";
 	while(1){
+		char messageForme[TAILLE_MAX]="                    Recu : ";
+		if(strcmp(message,"fin")==0){//si le client a envoyé fin on arrete ce thread
+			//pthread_exit(NULL);
+			kill(getpid(),1);
+		}
 		recep_mess(mess,dS);
 		if(strcmp(mess,"fin")==0){
 			kill(getpid(),1);
 		}
-		puts(mess);
+		strcat(messageForme,mess);
+		puts(messageForme);
 	}
 }
 
@@ -106,26 +114,28 @@ int communication(){
 
 	int trecep = pthread_create(&threadRecep,NULL,thread_reception,NULL);
 	if(trecep!=0){
-		printf("erreur thread recepetion");
+		printf("Erreur thread recepetion\n");
 		return 80;
 	}
 	
 	int tsaisie = pthread_create(&threadSaisie,NULL,thread_saisie,NULL);
 	if(tsaisie!=0){
-		printf("erreur thread saisie");
+		printf("Erreur thread saisie\n");
 		return 81;
 	}
 	
 	if(pthread_join(threadRecep,NULL)){
-		printf("probleme join reception");
+		printf("Probleme join reception\n");
 		return 82;
 	}
 	
 	if(pthread_join(threadSaisie,NULL)){
-		printf("probleme join saisie");
+		printf("Probleme join saisie\n");
 		return 83;
 	}
-	
+	close(dS);
+	pthread_cancel(threadRecep);
+	pthread_cancel(threadSaisie);
 	return 0;
 }
 

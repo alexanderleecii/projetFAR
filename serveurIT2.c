@@ -10,12 +10,12 @@
 
 #define TAILLE_MAX 500
 #define PORT 2633
-#define IP "172.20.10.4"
+#define IP "192.168.1.16"
 
 int dS,dSClient1,dSClient2;
 int echange=1;
 
-//fonction pour creer le serveur qui accuillera les deux clients.
+//fonction pour creer le serveur qui acceuillera les deux clients.
 int serveur(){
 	int dS = socket(PF_INET, SOCK_STREAM, 0); //creation socket serveur
 	struct sockaddr_in adServeur; //création de la structure contenant l'adresse du serveur
@@ -24,7 +24,7 @@ int serveur(){
 	adServeur.sin_port=htons(PORT); //définition du port
 	int sockAd = bind(dS,(struct sockaddr*)&adServeur, sizeof(adServeur)); //lie la socket a une adresse
 	if (sockAd==-1){
-		printf("erreur association");
+		printf("Erreur association\n");
 		return -1;
 	}
 	listen(dS,10); //socket en mode ecoute (10 represente le nb max de demandes de connexion pouvant etre mis en attente)
@@ -36,10 +36,10 @@ int connexion_client(int dS, int numClient){
 
 	struct sockaddr_in adClient; //structrue de l'adresse client
 	socklen_t lg = sizeof(struct sockaddr_in*);
-	int dSClient = accept(dS,(struct sockaddr*)&adClient,&lg);
+	int dSClient = accept(dS,(struct sockaddr*)&adClient,&lg);//accepte une connexion client
 
 	if(dSClient == -1){
-		printf("erreur connexion du client numero %d", numClient);
+		printf("Erreur connexion du client numero %d\n", numClient);
 	}
 	printf("Connexion client %d\n",numClient);
 	return dSClient;
@@ -49,7 +49,7 @@ int connexion_client(int dS, int numClient){
 int envoie_mess(char *mess, int dSCli, int numClient){
 	int envoie = send(dSCli,mess,(strlen(mess)+1)*sizeof(char),0);
 	if(envoie == -1){
-		printf("echec de l'envoie du message du client %d",numClient);
+		printf("Echec de l'envoie du message du client %d\n",numClient);
 		return 34;
 	}
 	return envoie;
@@ -60,7 +60,7 @@ int recep_mess(char *mess, int dSCli, int numClient){
 
 	int rec = recv(dSCli,mess,TAILLE_MAX*sizeof(char),0);
 	if(rec==-1){
-		printf("erreur reception");
+		printf("Erreur reception\n");
 		return 66;
 	}
 	if(strcmp(mess, "fin") == 0){
@@ -76,9 +76,11 @@ void *CLi1_vers_cli2(void *arg){
 		int recep = recep_mess(mess,dSClient1,1);
 		
 		int envoie = envoie_mess(mess,dSClient2,2);
-
-		if(recep!=0 || envoie!=0){
-			printf("erreur envoie ou recep");
+		if(strcmp(mess, "fin") == 0){
+			pthread_exit(NULL);
+		}
+		if(recep<0 || envoie<0){
+			printf("Erreur envoi ou recep\n");
 		}
 
 	}
@@ -91,9 +93,11 @@ void *CLi2_vers_cli1(void *arg){
 		int recep = recep_mess(mess,dSClient2,2);
 		
 		int envoie = envoie_mess(mess,dSClient1,1);
-
-		if(recep!=0 || envoie!=0){
-			printf("erreur envoie ou recep");
+		if(strcmp(mess, "fin") == 0){
+			pthread_exit(NULL);
+		}
+		if(recep<0 || envoie<0){
+			printf("Erreur envoi ou recep\n");
 		}
 
 	}
@@ -102,6 +106,7 @@ void *CLi2_vers_cli1(void *arg){
 int communcation(){
 	dS=serveur();
 	while(1){
+		printf("Attente d'une double connexion...\n");
 		char bienv[TAILLE_MAX]="bienvenue client 1";
 		char bienv2[TAILLE_MAX]="bienvenue client 2";
 		//accept client 1 sur serveur
@@ -109,27 +114,27 @@ int communcation(){
 		int envoie1 = envoie_mess(bienv,dSClient1,1);
 		
 		if(envoie1==-1){
-			printf("probleme envoie message");
+			printf("Probleme envoi message\n");
 			return 45;
 		}
-		printf("attente d'une double connexion");
+		
 		//accept client 2 sur serveur
 		dSClient2 = connexion_client(dS,2);
 		int envoie2 = envoie_mess(bienv2,dSClient2,1);
 		if(envoie2==-1){
-			printf("probleme envoie message");
+			printf("Probleme envoi message\n");
 			return 46;
 		}
-		printf("attente d'une double connexion");
-		sleep(5);
+		
+		sleep(2);
 		//previens au client 1 que deux clients sont connectes
-		if(envoie_mess("vous etes deux connectez sur le serveur",dSClient1,1)==-1){
-			printf("probleme envoie message");
+		if(envoie_mess("Vous etes deux connectés sur le serveur\n",dSClient1,1)==-1){
+			printf("Probleme envoi message\n");
 			return 47;
 		//previens au client 2 que deux clients sont connectes
 		}
-		if(envoie_mess("vous etes deux connectez sur le serveur",dSClient2,1)==-1){
-			printf("probleme envoie message");
+		if(envoie_mess("Vous etes deux connectés sur le serveur\n",dSClient2,1)==-1){
+			printf("Probleme envoi message\n");
 			return 48;
 
 		}
@@ -173,7 +178,9 @@ int communcation(){
 }
 
 int main(){
-	communcation();
+	while(1){
+		communcation();
+	}
 	return 0;
 }
 
