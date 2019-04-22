@@ -12,10 +12,13 @@
 #define TAILLE_MAX 50
 #define PORT 2633
 #define IP "192.168.1.99"
-#define NBCLIENT 50;
+#define NBCLIENT 50
 
+int nbCliActuel;
 int dSCli[NBCLIENT];
 char tabPseudo[NBCLIENT][30];
+
+pthread_t connecte[NBCLIENT];
 
 
 int recep_pseudo(char *pseudo, int num){
@@ -23,8 +26,66 @@ int recep_pseudo(char *pseudo, int num){
 		printf("erreur reception pseudo\n");
 		return 30;
 	}
-	strcpy(tabPseudo[i],pseudo); //&pseudo ? //stock les pseudo
+	strcpy(tabPseudo[num],pseudo); //&pseudo ? //stock les pseudo
 }
+
+void thread_recep_envoie(){
+	char mess[TAILLE_MAX];
+	int num;
+	if(recv(dSCli[num],mess,(strlen(mess)+1)*sizeof(char),0)!=0){
+		printf("erreur reception thread\n");
+	}
+
+
+
+	if(strcmp(mess,"fin")==0){
+		for(int i=0;i<nbCliActuel;i++){
+			close(dSCli[i]);
+		}
+	}
+	char affichage[TAILLE_MAX];
+	strcpy(affichage,tabPseudo[num]);
+	strcat(affichage," : ");
+	strcat(affichage,mess);
+
+	for(int parcoursCli=0;parcoursCli<nbCliActuel;parcoursCli++){
+		if(parcoursCli!=num){
+			if(send(dSCli[parcoursCli],affichage,(strlen(affichage)+1)*sizeof(char),0)!=0){
+				printf("erreur global send\n");
+			}
+		}
+	}
+	pthread_exit(NULL);
+
+}
+
+void thread_connexion(){
+	nbCliActuel=0;
+	int dSC;
+	struct sockaddr_in aClient;
+	char pseudo[30];
+	int nb=0;
+	socklen_t lgA= sizeof(struct sockaddr_in);
+	while(nb<NBCLIENT){
+		dSCli[nb] = accept(dSC, (struct sockaddr *)&aClient,&lgA);
+		if(dSCli[nb]!=0){
+			printf("erreur connexion client thread");
+		}
+		recep_pseudo(pseudo,nb);
+		printf("CLIENT %d pseudo %s \n",nb+1,pseudo[nb]);
+
+		int pcreate = pthread_create(connecte[nb],NULL,thread_recep_envoie,NULL);
+		if(pcreate!=0){
+			printf("erreur thread connect");
+		}
+		nbCliActuel++;
+		nb++;
+	}
+
+	pthread_exit(NULL);
+
+}
+
 
 
 
@@ -44,7 +105,32 @@ int main(){
 		return 60;
 	} //socket en mode ecoute (10 represente le nb max de demandes de connexion pouvant etre mis en attente)
 
-	
+	while(1){
+		nbCliActuel=0;
+		printf("le serveur sera operationnel lorsque deux clients seront connectes\n");
+
+		pthread_t thread;
+		if(pthread_create(&thread,NULL,thread_connexion,NULL)){
+			printf("erreur thread co client");
+			return 81;
+		}
+
+		//le systeme se lance lorsque deux clients sont connectes 
+		while(nbCliActuel<2){
+
+		}
+
+		if(pthread_join(connecte[0],NULL)){
+			printf("probleme join\n");
+			return 82;
+		}
+
+		
+
+
+	}
+
+	return 0;
 }
 
 
