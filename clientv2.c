@@ -13,7 +13,7 @@
 
 #define TAILLE_MAX 50
 #define PORT 2633
-#define IP "192.168.1.99"
+#define IP "162.38.111.12"
 #define NBCLIENT 50
 
 int dS;
@@ -101,26 +101,18 @@ int communication(){
 	//stock le pseudo
 	char pseudo[30];
 	
-	//a chaque nouvelle connexion client celui ci doit choisir un pseudo qui n'existe pas deja
+	//a chaque nouvelle connexion client celui ci doit choisir un pseudo
 	int arret = 0;
-	while(arret=1){
-		printf("veuillez choisir un pseudo qui ne depasse pas 30 caracteres :\n");
-		fgets(pseudo,30,stdin);
-		char *pos=strchr(pseudo,'\n');//repere et remplace le \n ajouté automatiquement à la fin de la chaine de caractere par un \0
-		*pos='\0';
-		int position=0; 
-		for(int i=0;i<position;i++){
-			if(tabPseudo[i]==pseudo){
-				printf("pseudo deja utilise veuillez en choisir un autre\n");
-				printf("\n");
-			}
-			else{
-				tabPseudo[position]=pseudo;
-				position+=1;
-				arret=0;
-			}
-		}
-	}
+	int position = 0;
+	
+	printf("veuillez choisir un pseudo qui ne depasse pas 30 caracteres :\n");
+	fgets(pseudo,30,stdin);
+	char *pos=strchr(pseudo,'\n');//repere et remplace le \n ajouté automatiquement à la fin de la chaine de caractere par un \0
+	*pos='\0';
+	send_pseudo(pseudo);
+
+	
+
 
 
 	pthread_t threadRecep;

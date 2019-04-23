@@ -11,7 +11,7 @@
 
 #define TAILLE_MAX 50
 #define PORT 2633
-#define IP "192.168.1.99"
+#define IP "162.38.111.12"
 #define NBCLIENT 50
 
 int nbCliActuel;
@@ -29,7 +29,7 @@ int recep_pseudo(char *pseudo, int num){
 	strcpy(tabPseudo[num],pseudo); //&pseudo ? //stock les pseudo
 }
 
-void thread_recep_envoie(){
+void* thread_recep_envoie(void *arg){
 	char mess[TAILLE_MAX];
 	int num;
 	if(recv(dSCli[num],mess,(strlen(mess)+1)*sizeof(char),0)!=0){
@@ -59,7 +59,7 @@ void thread_recep_envoie(){
 
 }
 
-void thread_connexion(){
+void* thread_connexion(void *arg){
 	nbCliActuel=0;
 	int dSC;
 	struct sockaddr_in aClient;
@@ -72,9 +72,9 @@ void thread_connexion(){
 			printf("erreur connexion client thread");
 		}
 		recep_pseudo(pseudo,nb);
-		printf("CLIENT %d pseudo %s \n",nb+1,pseudo[nb]);
+		printf("CLIENT %d pseudo %s \n",nb+1,tabPseudo[nb]);
 
-		int pcreate = pthread_create(connecte[nb],NULL,thread_recep_envoie,NULL);
+		int pcreate = pthread_create(&connecte[nb],NULL,thread_recep_envoie,NULL);
 		if(pcreate!=0){
 			printf("erreur thread connect");
 		}
