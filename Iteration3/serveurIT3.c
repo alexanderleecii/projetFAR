@@ -9,11 +9,12 @@
 #include <pthread.h>
 
 #define TAILLE_MAX 500
-#define PORT 2633
-#define IP "127.0.0.1"
 
-int dS,dSClient1,dSClient2;
+char IP[100];
+int PORT,dS,dSClient1,dSClient2;
 int echange=1;
+pthread_t Cli1;
+pthread_t Cli2;
 
 //fonction pour creer le serveur qui acceuillera les deux clients.
 int serveur(){
@@ -91,6 +92,9 @@ void *CLi1_vers_cli2(void *arg){
 		
 		int envoie = envoie_mess(mess,dSClient2,2);
 		if(strcmp(mess, "fin") == 0){
+			if(pthread_cancel(Cli2)!=0){//On ferme le thread d'échange du client2
+				printf("Je n'arrive pas à supprimer le thread 2\n");
+			}
 			pthread_exit(NULL);
 		}
 		if(recep<0 || envoie<0){
@@ -108,6 +112,9 @@ void *CLi2_vers_cli1(void *arg){
 		
 		int envoie = envoie_mess(mess,dSClient1,1);
 		if(strcmp(mess, "fin") == 0){
+			if(pthread_cancel(Cli1)!=0){//On ferme le thread d'échange du client 1
+				printf("Je n'arrive pas à fermer le thread1\n");
+			}
 			pthread_exit(NULL);
 		}
 		if(recep<0 || envoie<0){
@@ -152,49 +159,45 @@ int communcation(){
 			return 48;
 
 		}
-		echange=1;
-		while(echange==1){
-			pthread_t Cli1;
-			pthread_t Cli2;
-
-			int cr1 = pthread_create(&Cli1,NULL,CLi1_vers_cli2,NULL);
-			if(cr1!=0){
-				printf("erreur thread client 1");
-				return 72;
-			}
-
-			int cr2 = pthread_create(&Cli2,NULL, CLi2_vers_cli1,NULL);
-			if(cr2!=0){
-				printf("erreur thread client 2");
-				return 73;
-			}
-
-			int p1 = pthread_join(Cli1,NULL);
-			if(p1!=0){
-				printf("erreur pause client 1");
-				return 74;
-			}
-
-			int p2 = pthread_join(Cli2,NULL);
-			if(p2!=0){
-				printf("erreur pause client 2");
-				return 75;
-			}
-			echange=0;
-			close(dSClient1);
-			close(dSClient2);
+		
+		
+		int cr1 = pthread_create(&Cli1,NULL,CLi1_vers_cli2,NULL);
+		if(cr1!=0){
+			printf("erreur thread client 1");
+			return 72;
+		}
+		
+		int cr2 = pthread_create(&Cli2,NULL, CLi2_vers_cli1,NULL);
+		if(cr2!=0){
+			printf("erreur thread client 2");
+			return 73;
 		}
 
+		int p1 = pthread_join(Cli1,NULL);
+		if(p1!=0){
+			printf("erreur pause client 1");
+			return 74;
+		}
+
+		int p2 = pthread_join(Cli2,NULL);
+		if(p2!=0){
+			printf("erreur pause client 2");
+			return 75;
+		}
+		echange=0;
+		close(dSClient1);
+		close(dSClient2);
 	}
 	close(dS);
 
 	return 0;
 }
 
-int main(){
-	while(1){
-		communcation();
-	}
+int main(int argc,char* argv[]){
+	strcpy(IP,argv[1]);
+	PORT=atoi(argv[2]);
+	communcation();
+	
 	return 0;
 }
 

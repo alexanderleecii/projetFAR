@@ -12,13 +12,11 @@
 #include <limits.h>
 
 #define TAILLE_MAX 500
-#define PORT 2633
-#define IP "127.0.0.1"
 
-
-int dS;
-char mess[TAILLE_MAX];
-char *message;//buffer
+char IP[100];
+int PORT,dS;
+pthread_t threadRecep;
+pthread_t threadSaisie;
 
 int recep_mess(char *mess, int dScli){
 	int octMsg;
@@ -26,72 +24,18 @@ int recep_mess(char *mess, int dScli){
 	int rec = recv(dScli,&octMsg,sizeof(int),0);//nb octets
 	if(rec<0){
 		printf("erreur reception taille\n");
+		return -6;
 	}
 	int nbOctRecu=0;
 	while(nbOctRecu<octMsg){
 		rec = recv(dScli,mess,octMsg*sizeof(char),0);
 		if(rec<0){
 			printf("erreur reception mess\n");
+			return -6;
 		}
 		nbOctRecu+=rec;
 	}
-	//int rec = recv(dScli,mess,TAILLE_MAX*sizeof(char),0);//Reception à partir du serveur dans le client
-	
-	if(rec==-1){
-		printf("Erreur reception client \n");
-		return 4;
-	}
-	//verifie si le message envoye est fin, si oui exit 
-	if(strcmp(message, "fin") == 0){
-		printf("Déconnexion du serveur.\n");
-	}
-	if(strcmp("bienvenue client 1",mess)==0){
-		printf("Bienvenue client 1\n");
-	}
-	if(strcmp("bienvenue client 2",mess)==0){
-		printf("Bienvenue client 2\n");
-	}
-	if(strcmp(mess,"file")==0){
-		rec = recv(dScli,&octMsg,sizeof(int),0);//nb octets
-		printf("taille nom fic : %d\n",rec);
-		if(rec<0){
-			printf("erreur reception taille nom fichier\n");
-		}
-		int nbOctRecu=0;
-		while(nbOctRecu<octMsg){
-			rec = recv(dScli,mess,octMsg*sizeof(char),0);
-			if(rec<0){
-				printf("erreur reception nom fichier\n");
-			}
-			nbOctRecu+=rec;
-		}
-		char fileName[octMsg*sizeof(char)];
-		char* extension="./Recep/";
-		char* buffer=malloc(strlen(extension)+octMsg*sizeof(char));
-		strcpy(fileName,mess);
-		strcpy(buffer,extension);
-		strcat(buffer,fileName);
-		printf("nom fic : %s\n",buffer);
-		rec = recv(dScli,&octMsg,sizeof(int),0);//nb octets
-		if(rec<0){
-			printf("erreur reception taille contenu fichier\n");
-		}
-		nbOctRecu=0;
-		while(nbOctRecu<octMsg){
-			rec = recv(dScli,mess,octMsg*sizeof(char),0);
-			if(rec<0){
-				printf("erreur reception contenu fichier\n");
-			}
-			nbOctRecu+=rec;
-		}
-		char str[50000];
-		strcpy(str,mess);
-		FILE* fichier = fopen(buffer,"w");
-		fputs(str,fichier);
-		fclose(fichier);
-	}
 	return rec;
-
 }
 
 int get_last_tty() {
@@ -145,7 +89,7 @@ void *thread_envoi_fic(void *arg){
 	dp = opendir ("./Envois");
 	if (dp != NULL) {
 		fprintf(fp1,"Voilà la liste de fichiers :\n");
-		while (ep = readdir(dp)) {
+		while ( (ep = readdir(dp)) ) {
 		if(strcmp(ep->d_name,".")!=0 && strcmp(ep->d_name,"..")!=0) 
 			fprintf(fp1,"%s\n",ep->d_name);
 		}    
@@ -160,24 +104,30 @@ void *thread_envoi_fic(void *arg){
 	fgets(fileName,sizeof(fileName),stdin);
 	fileName[strlen(fileName)-1]='\0';
 	strcat(dossier,fileName);
-	int taille=(strlen(fileName)+1)*sizeof(char);			  //Envoi du
-	int res=send(dS,&taille,sizeof(int),0);      			  //Nom du
-	res=send(dS,fileName,(strlen(fileName)+1)*sizeof(char),0);//Fichier à envoyer
-
 	FILE *fichier = fopen(dossier, "r");
 	if (fichier == NULL){
 		printf("Ne peux pas ouvrir le fichier suivant : %s\n",fileName);
 	}
 	else {
-		char str[50000];
-		char tmp[50000];    
+		int taille=(strlen(fileName)+1)*sizeof(char);			  //Envoi du
+		int res=send(dS,&taille,sizeof(int),0);      			  //Nom du
+		res=send(dS,fileName,taille,0);//Fichier à envoyer
+
+		char str[TAILLE_MAX];
+		char end_char[1];
+		end_char[0]=EOF;  
 		// Lire et afficher le contenu du fichier
-		while (fgets(tmp, 50000, fichier) != NULL) {
-			strcat(str,tmp);
+		while (fgets(str, TAILLE_MAX, fichier) != NULL) {
+			taille=(strlen(str)+1)*sizeof(char);
+			res=send(dS,&taille,sizeof(int),0);
+			res=send(dS,str,taille,0);
+			if(res<0){
+				printf("Erreur envoi fichier\n");
+			}
 		}
-		taille=(strlen(str)+1)*sizeof(char);
+		taille=(strlen(end_char)+1)*sizeof(char);
 		res=send(dS,&taille,sizeof(int),0);
-		res=send(dS,str,(strlen(str)+1)*sizeof(char),0);
+		res=send(dS,end_char,taille,0);
 		if(res<0){
 			printf("Erreur envoi fichier\n");
 		}
@@ -186,8 +136,46 @@ void *thread_envoi_fic(void *arg){
 	pthread_exit(NULL);
 }
 
+void *thread_recep_fic(void *arg){
+	int octMsg;
+	int rec = recv(dS,&octMsg,sizeof(int),0);//nb octets nom fichier
+	printf("taille nom fic : %d\n",rec);
+	if(rec<0){
+		printf("erreur reception taille nom fichier\n");
+		pthread_exit(NULL);
+	}
+	char fileName[octMsg*sizeof(char)];
+	int nbOctRecu=0;
+	while(nbOctRecu<octMsg){
+		rec = recv(dS,fileName,octMsg*sizeof(char),0);
+		if(rec<0){
+			printf("erreur reception nom fichier\n");
+			pthread_exit(NULL);
+		}
+		nbOctRecu+=rec;
+	}
+	char* extension="./Recep/";
+	char* buffer=malloc(strlen(extension)+octMsg*sizeof(char));
+	strcpy(buffer,extension);
+	strcat(buffer,fileName);
+	printf("nom fic : %s\n",buffer);
+
+	FILE* fichier = fopen(buffer,"a");
+	char str[TAILLE_MAX];
+	while(1){
+		rec=recep_mess(str,dS);
+		if(str[0]==EOF){
+			break;
+		}
+		fputs(str,fichier);
+	}
+	fclose(fichier);
+	free(buffer);
+	pthread_exit(NULL);
+}
+
 void *thread_saisie(void *arg){
-	message=(char *)malloc((TAILLE_MAX)*sizeof(char));
+	char *message=(char *)malloc((TAILLE_MAX)*sizeof(char));
 	char recupMessage[TAILLE_MAX];
 	while(1){
 		printf(">>> ");
@@ -226,8 +214,9 @@ void *thread_saisie(void *arg){
 			printf("Erreur envoi message.\n");
 		}
 
-		if(strcmp(message,"fin")==0 /*|| strcmp(mess,"fin")==0*/){//si le client a envoye fin on arrete ce thread
-			kill(getpid(),1);
+		if(strcmp(message,"fin")==0){//si le client a envoye fin on arrete ce thread
+			pthread_cancel(threadRecep);
+			pthread_exit(NULL);
 		}
 	}
 	
@@ -235,18 +224,29 @@ void *thread_saisie(void *arg){
 }
 
 void *thread_reception(void *arg){
-	message="";
+	char mess[TAILLE_MAX];
 	while(1){
 		char messageForme[TAILLE_MAX]="                    Recu : ";
-		if(strcmp(mess,"fin")==0){//si le client a envoyé fin on arrete ce thread
-			kill(getpid(),1);
-		}
 		recep_mess(mess,dS);
-		if(strcmp(mess,"fin")==0){
-			kill(getpid(),1);
-		}
 		strcat(messageForme,mess);
 		puts(messageForme);
+		//verifie si le message envoye est fin, si oui exit 
+		if(strcmp(mess,"fin")==0){
+			printf("Déconnexion du serveur.\n");
+			pthread_cancel(threadSaisie);
+			pthread_exit(NULL);
+		}
+		
+		if(strcmp(mess,"file")==0){
+			pthread_t recepFic;
+			if(pthread_create(&recepFic,NULL,thread_recep_fic,NULL)!=0){
+				printf("Erreur création thread fichier\n");
+			}
+
+			if(pthread_join(recepFic,NULL)!=0){
+				printf("Probleme join fichier\n");
+			}
+		}
 	}
 }
 
@@ -276,8 +276,7 @@ int communication(){
 		return 3;
 	}
 
-	pthread_t threadRecep;
-	pthread_t threadSaisie;
+	
 
 	int trecep = pthread_create(&threadRecep,NULL,thread_reception,NULL);
 	if(trecep!=0){
@@ -301,15 +300,15 @@ int communication(){
 		return 83;
 	}
 	close(dS);
-	pthread_cancel(threadRecep);
-	pthread_cancel(threadSaisie);
 	return 0;
 }
 
 
 
 
-int main(){
+int main(int argc, char* argv[]){
+	strcpy(IP,argv[1]);
+	PORT=atoi(argv[2]);
 	communication();
 	return 0;
 }
