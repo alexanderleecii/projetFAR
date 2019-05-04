@@ -12,9 +12,7 @@
 
 char IP[100];
 int PORT,dS,dSClient1,dSClient2;
-int echange=1;
-pthread_t Cli1;
-pthread_t Cli2;
+pthread_t Cli1,Cli2;
 
 //fonction pour creer le serveur qui acceuillera les deux clients.
 int serveur(){
@@ -184,7 +182,6 @@ int communcation(){
 			printf("erreur pause client 2");
 			return 75;
 		}
-		echange=0;
 		close(dSClient1);
 		close(dSClient2);
 	}
