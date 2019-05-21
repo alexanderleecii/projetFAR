@@ -161,7 +161,10 @@ void* thread_connexion(void *arg){
 		int res = envoie_mess(mess,dSCli[numeroDispo],numeroDispo+1);//Envoi de la demande de choix de channel
 
 		res = recep_mess(mess,dSCli[numeroDispo],numeroDispo+1);//Réception du choix de channel
-		perror("recep_mess");
+
+		int choix = atoi(mess);
+
+		
 		//Traiter le mess reçu pour envoyer le client dans le bon salon
 		sleep(2);
 	}
