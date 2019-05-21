@@ -12,9 +12,15 @@
 #define NBCLIENT 50
 
 char IP[100];
-int PORT,dS;
+int PORT;
+int stockdS[5][10];
+
+int dSServeurPrinc;
 int dSCli[50];
 int dispoNum[NBCLIENT][1];
+char channel_name[5][20] = {"1 : channel1", "2 : channel2", "3 : channel3", "4 : channel4", "5 : channel5"};
+int tab_channels[5];
+int nbCliActuel = 0;
 
 pthread_t Cli1,Cli2;
 
@@ -37,6 +43,7 @@ int envoie_mess(char *mess, int dSCli, int numClient){
 //fonction pour recevoir un message
 int recep_mess(char *mess, int dSCli, int numClient){
 	int octMsg;
+	
 	int rec = recv(dSCli,&octMsg,sizeof(int),0);//nb octets
 	if(rec<0){
 		printf("erreur reception taille\n");
@@ -57,7 +64,7 @@ int recep_mess(char *mess, int dSCli, int numClient){
 
 }
 //communcation du client 1 vers le client 2
-void *CLi1_vers_cli2(void *arg){
+/*void *CLi1_vers_cli2(void *arg){
 	char mess[TAILLE_MAX];
 	while(1){
 		int recep = recep_mess(mess,dSClient1,1);
@@ -94,7 +101,7 @@ void *CLi2_vers_cli1(void *arg){
 		}
 
 	}
-}
+}*/
 
 //fonction pour creer le serveur qui acceuillera les deux clients.
 int serveur(){
@@ -104,7 +111,8 @@ int serveur(){
 	adServeur.sin_addr.s_addr=INADDR_ANY;
 	adServeur.sin_port=htons(PORT); //définition du port
 	int sockAd = bind(dS,(struct sockaddr*)&adServeur, sizeof(adServeur)); //lie la socket a une adresse
-	if (sockAd==-1){
+	
+	if (sockAd < 0){
 		printf("Erreur association\n");
 		return -1;
 	}
@@ -119,7 +127,7 @@ int connexion_client(int dS, int numClient){
 	struct sockaddr_in adClient; //structrue de l'adresse client
 	socklen_t lg = sizeof(struct sockaddr_in*);
 	int dSClient = accept(dS,(struct sockaddr*)&adClient,&lg);//accepte une connexion client
-
+	perror("accept");
 	if(dSClient == -1){
 		printf("Erreur connexion du client numero %d\n", numClient);
 	}
@@ -134,7 +142,6 @@ void* thread_connexion(void *arg){
 		strcat(channels,channel_name[j]);
 		strcat(channels, " ");
 	}
-	
 	while(nbCliActuel<NBCLIENT){
 		int i=0;
 		int dispo=0;//Sert à repérer si le numéro de client est dispo ou pas
@@ -146,57 +153,51 @@ void* thread_connexion(void *arg){
 		}
 		
 		int numeroDispo = i-1; //Premier numero de client disponible
-		dSCli[numeroDispo] = connexion_client(dS,1);
-		int envoi_channels = envoie_mess(channels,dSClient[numeroDispo],numeroDispo+1);
+		dSCli[numeroDispo] = connexion_client(dSServeurPrinc,1);
+		int envoi_channels = envoie_mess(channels,dSCli[numeroDispo],numeroDispo+1);
 		if(envoi_channels==-1){
 			printf("Probleme envoi message\n");
-			return 45;
 		}
-		int res = envoie_mess(mess,dSClient[numeroDispo],numeroDispo+1);//Envoi de la demande de choix de channel
+		int res = envoie_mess(mess,dSCli[numeroDispo],numeroDispo+1);//Envoi de la demande de choix de channel
 
-		res = recep_mess(mess,dSClient[numeroDispo],numeroDispo+1);//Réception du choix de channel
+		res = recep_mess(mess,dSCli[numeroDispo],numeroDispo+1);//Réception du choix de channel
+		perror("recep_mess");
 		//Traiter le mess reçu pour envoyer le client dans le bon salon
 		sleep(2);
 	}
 }
 
 int accept_client(){
+	pthread_t connection[NBCLIENT];
 	while(1){
 		printf("Attente d'une connexion...\n");
-		for(int i=0;i<NBCLIENT;i++){
+		int i;
+		for(i=0;i<NBCLIENT;i++){
 			dispoNum[i][0]=0;
 		}
-		nbCliActuel=0;
 
 		pthread_t thread;
 		int *arg=malloc(sizeof(*arg)); //Revoir ça
-		*arg=dS;//Revoir ça
+		*arg=dSServeurPrinc;//Revoir ça
 		if(pthread_create(&thread,NULL,thread_connexion,arg)){
 			printf("erreur thread co client");
 			return 81;
 		}
 
-		if(pthread_join(connecte[0],NULL)){
+		while(nbCliActuel < 1){}
+
+		if(pthread_join(connection[i],NULL)){
 			printf("probleme join\n");
 			return 82;
 		}
 	}
 }
 
-int init_channels(){
-	int tab_channels[5];
-	char channel_name[5][20] = {"1 : channel1", "2 : channel2", "3 : channel3", "4 : channel4", "5 : channel5"};
-	for(int i = 0;i<5;i++){
-		tab_channels[i] = serveur();
-	}
-	return
-}
-
 int main(int argc,char* argv[]){
 	strcpy(IP,argv[1]);
-	PORT=atoi(argv[2]);
-	dS = serveur()
-	init_channels();
+	PORT = atoi(argv[2]);
+
+	dSServeurPrinc = serveur();
 	accept_client();
 	
 	return 0;

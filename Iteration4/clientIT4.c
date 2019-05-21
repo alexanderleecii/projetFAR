@@ -101,6 +101,7 @@ int communication(){
 	}
 	socklen_t lgA=sizeof(struct sockaddr_in);//longueur de l'adresse
 	int resCo=connect(dS,(struct sockaddr *)&adServ,lgA);//effectue une demande de connexion à l'adresse IP
+	perror("connect");
 	if(resCo==-1){
 		printf("Erreur de connexion.\n");
 		return 3;
