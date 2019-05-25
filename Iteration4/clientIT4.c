@@ -18,6 +18,18 @@ int PORT,dS;
 pthread_t threadRecep;
 pthread_t threadSaisie;
 
+void send_pseudo(char* pseudo){
+	int taille=(strlen(pseudo)+1)*sizeof(char);
+	int res=send(dS,&taille,sizeof(int),0);  
+	if(res<0){
+		printf("erreur envoi taille\n");
+	}
+	res=send(dS,pseudo,(strlen(pseudo)+1)*sizeof(char),0);
+	if(res<0){
+		printf("Erreur envoi message.\n");
+	}
+}
+
 int recep_mess(char *mess, int dScli){
 	int octMsg;
 		
@@ -106,6 +118,15 @@ int communication(){
 		printf("Erreur de connexion.\n");
 		return 3;
 	}
+	
+	//stock le pseudo
+	char pseudo[30];
+	
+	printf("Veuillez choisir un pseudo qui ne depasse pas 30 caracteres :\n");
+	fgets(pseudo,30,stdin);
+	char *pos=strchr(pseudo,'\n');//repere et remplace le \n ajouté automatiquement à la fin de la chaine de caractere par un \0
+	*pos='\0';
+	send_pseudo(pseudo);
 
 	int trecep = pthread_create(&threadRecep,NULL,thread_reception,NULL);
 	if(trecep!=0){
