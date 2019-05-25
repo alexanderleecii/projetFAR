@@ -14,15 +14,24 @@
 char IP[100];
 int PORT;
 int stockdS[5][10];
+pthread_t threads[NBCLIENT];
 
 int dSServeurPrinc;
-int dSCli[50];
+int dSCli;
 int dispoNum[NBCLIENT][1];
 char channel_name[5][20] = {"1 : channel1", "2 : channel2", "3 : channel3", "4 : channel4", "5 : channel5"};
 int tab_channels[5];
 int nbCliActuel = 0;
 
 pthread_t Cli1,Cli2;
+
+struct Client
+{
+	int dSClient;
+	int choixChannel;
+};
+
+struct Client clients[NBCLIENT];
 
 //fonction pour envoyer un message
 int envoie_mess(char *mess, int dSCli, int numClient){
@@ -63,45 +72,6 @@ int recep_mess(char *mess, int dSCli, int numClient){
 	return rec;
 
 }
-//communcation du client 1 vers le client 2
-/*void *CLi1_vers_cli2(void *arg){
-	char mess[TAILLE_MAX];
-	while(1){
-		int recep = recep_mess(mess,dSClient1,1);
-		
-		int envoie = envoie_mess(mess,dSClient2,2);
-		if(strcmp(mess, "fin") == 0){
-			if(pthread_cancel(Cli2)!=0){//On ferme le thread d'échange du client2
-				printf("Je n'arrive pas à supprimer le thread 2\n");
-			}
-			pthread_exit(NULL);
-		}
-		if(recep<0 || envoie<0){
-			printf("Erreur envoi ou recep\n");
-		}
-
-	}
-}
-
-//communcation du client 2 vers le client 1
-void *CLi2_vers_cli1(void *arg){
-	char mess[TAILLE_MAX];
-	while(1){
-		int recep = recep_mess(mess,dSClient2,2);
-		
-		int envoie = envoie_mess(mess,dSClient1,1);
-		if(strcmp(mess, "fin") == 0){
-			if(pthread_cancel(Cli1)!=0){//On ferme le thread d'échange du client 1
-				printf("Je n'arrive pas à fermer le thread1\n");
-			}
-			pthread_exit(NULL);
-		}
-		if(recep<0 || envoie<0){
-			printf("Erreur envoi ou recep\n");
-		}
-
-	}
-}*/
 
 //fonction pour creer le serveur qui acceuillera les deux clients.
 int serveur(){
@@ -135,14 +105,48 @@ int connexion_client(int dS, int numClient){
 	return dSClient;
 }
 
+void* thread_communication(void *arg){
+	int dSCli = clients[*(int*)arg].dSClient;
+	int channel = clients[*(int*)arg].choixChannel;
+	
+	char mess[TAILLE_MAX];
+
+	while(1){
+		int recep = recep_mess(mess,dSCli,nbCliActuel);
+		printf("%s\n", mess);
+		int nbCliChannel;
+		int nbClients=0;
+		while(stockdS[channel - 1][nbClients] != -1){
+			nbClients++;
+		}
+	
+		for(int i=0;i<nbClients;i++){
+			if(stockdS[channel - 1][i] != dSCli){
+				int res = envoie_mess(mess,stockdS[channel - 1][i],nbCliActuel + i);
+			}
+		}
+		if(strcmp(mess, "fin") == 0){
+			pthread_exit(NULL);
+		}
+		
+	}
+}
+
 void* thread_connexion(void *arg){
-	char mess[TAILLE_MAX]="Entrez le numéro correspondant au channel choisi :";
-	char channels[TAILLE_MAX]="Channels disponibles : ";
-	for(int j = 0;j < 5;j++){
-		strcat(channels,channel_name[j]);
-		strcat(channels, " ");
+	char mess[TAILLE_MAX];
+	char channels[TAILLE_MAX];
+	for(int i = 0;i < 5; i++){
+		for(int j = 0;j < 10;j++){
+			stockdS[i][j]=-1;
+		}
 	}
 	while(nbCliActuel<NBCLIENT){
+		strcat(mess,"Entrez le numéro correspondant au channel choisi :");
+		strcat(channels,"Channels disponibles : ");
+		for(int j = 0;j < 5;j++){
+			strcat(channels,channel_name[j]);
+			strcat(channels, " ");
+		}
 		int i=0;
 		int dispo=0;//Sert à repérer si le numéro de client est dispo ou pas
 		while(dispo!=1){
@@ -153,25 +157,40 @@ void* thread_connexion(void *arg){
 		}
 		
 		int numeroDispo = i-1; //Premier numero de client disponible
-		dSCli[numeroDispo] = connexion_client(dSServeurPrinc,1);
-		int envoi_channels = envoie_mess(channels,dSCli[numeroDispo],numeroDispo+1);
+		dSCli = connexion_client(dSServeurPrinc,1);
+		int envoi_channels = envoie_mess(channels,dSCli,numeroDispo+1);
 		if(envoi_channels==-1){
 			printf("Probleme envoi message\n");
 		}
-		int res = envoie_mess(mess,dSCli[numeroDispo],numeroDispo+1);//Envoi de la demande de choix de channel
+		int res = envoie_mess(mess,dSCli,numeroDispo+1);//Envoi de la demande de choix de channel
 
-		res = recep_mess(mess,dSCli[numeroDispo],numeroDispo+1);//Réception du choix de channel
+		res = recep_mess(mess,dSCli,numeroDispo+1);//Réception du choix de channel
 
 		int choix = atoi(mess);
 
-		
+		clients[nbCliActuel].dSClient = dSCli;
+		clients[nbCliActuel].choixChannel = choix;
+
+		int indexInser = 0;
+		while(stockdS[choix - 1][indexInser] != -1 && indexInser < 10){
+			indexInser++;
+		}
+		stockdS[choix - 1][indexInser] = clients[nbCliActuel].dSClient;
+		int *arg=malloc(sizeof(*arg));
+		*arg=nbCliActuel;
+		if(pthread_create(&threads[nbCliActuel],NULL,thread_communication,arg)){
+			pthread_exit(NULL);
+		}
+		nbCliActuel+=1;
 		//Traiter le mess reçu pour envoyer le client dans le bon salon
 		sleep(2);
+		mess[0]='\0';
+		channels[0]='\0';
 	}
+	pthread_exit(NULL);
 }
 
 int accept_client(){
-	pthread_t connection[NBCLIENT];
 	while(1){
 		printf("Attente d'une connexion...\n");
 		int i;
@@ -180,18 +199,22 @@ int accept_client(){
 		}
 
 		pthread_t thread;
-		int *arg=malloc(sizeof(*arg)); //Revoir ça
-		*arg=dSServeurPrinc;//Revoir ça
+		int *arg=malloc(sizeof(*arg));
+		*arg=dSServeurPrinc;
 		if(pthread_create(&thread,NULL,thread_connexion,arg)){
 			printf("erreur thread co client");
 			return 81;
 		}
 
 		while(nbCliActuel < 1){}
-
-		if(pthread_join(connection[i],NULL)){
-			printf("probleme join\n");
-			return 82;
+		while(1){
+			for(int j = 0;j<nbCliActuel;j++){
+				if(pthread_join(threads[j],NULL)){
+					printf("probleme join\n");
+					perror("pthread_join");
+					return 82;
+				}
+			}
 		}
 	}
 }
