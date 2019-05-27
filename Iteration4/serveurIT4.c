@@ -23,7 +23,6 @@ char channel_name[5][20] = {"1 : channel1", "2 : channel2", "3 : channel3", "4 :
 int tab_channels[5];
 int nbCliActuel = 0;
 
-pthread_t Cli1,Cli2;
 
 struct Client
 {
